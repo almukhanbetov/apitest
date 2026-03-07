@@ -30,7 +30,7 @@ func main() {
 		})
 	})
 	r.GET("/users", getUsers)
-	r.Run(":8182")
+	r.Run("0.0.0.0:8182")
 }
 func getUsers(c *gin.Context) {
 	rows, err := db.Query("SELECT id,email FROM users")
