@@ -33,22 +33,25 @@ func main() {
 	r.Run("0.0.0.0:8182")
 }
 func getUsers(c *gin.Context) {
-	rows, err := db.Query("SELECT * FROM users")
+
+	rows, err := db.Query("SELECT id,phone,fullname FROM users")
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
 	}
 	defer rows.Close()
 	type User struct {
-		ID    int
-		Email string
-	}
+		ID       int    `json:"id"`
+		Phone    string `json:"phone"`
+		Fullname string `json:"fullname"`	}
+
 	var users []User
 
 	for rows.Next() {
 		var u User
-		rows.Scan(&u.ID, &u.Email)
+		rows.Scan(&u.ID, &u.Phone, &u.Fullname)
 		users = append(users, u)
 	}
+
 	c.JSON(200, users)
 }
