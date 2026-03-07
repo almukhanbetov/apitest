@@ -66,36 +66,43 @@ func getUsers(c *gin.Context) {
 	var users []User
 
 	for rows.Next() {
-
 		var u User
-
 		rows.Scan(&u.ID, &u.Phone, &u.Fullname)
-
 		users = append(users, u)
 	}
-
 	c.JSON(200, users)
-
 }
-
 func reportDevices(c *gin.Context) {
 
 	rows, err := db.Query(`
 SELECT
 d.account,
-d.device_name,
-u.fullname,
-ds.signal_wifi,
-COUNT(DISTINCT t.id),
-IFNULL(SUM(t.sum),0),
-COUNT(DISTINCT p.id),
-IFNULL(SUM(p.sum),0),
-(IFNULL(SUM(p.sum),0) - IFNULL(SUM(t.sum),0))
+MAX(d.device_name) as device_name,
+MAX(u.fullname) as user,
+MAX(ds.signal_wifi) as wifi_signal,
+
+COUNT(DISTINCT t.id) as transactions_count,
+IFNULL(SUM(t.sum),0) as transactions_sum,
+
+COUNT(DISTINCT p.id) as payments_count,
+IFNULL(SUM(p.sum),0) as payments_sum,
+
+(IFNULL(SUM(p.sum),0) - IFNULL(SUM(t.sum),0)) as balance
+
 FROM devices d
-LEFT JOIN users u ON u.user_code = d.user_code
-LEFT JOIN device_set ds ON ds.account = d.account
-LEFT JOIN transactions t ON t.account = d.account
-LEFT JOIN payments p ON p.account = d.account
+
+LEFT JOIN users u
+ON u.user_code = d.user_code
+
+LEFT JOIN device_set ds
+ON ds.account = d.account
+
+LEFT JOIN transactions t
+ON t.account = d.account
+
+LEFT JOIN payments p
+ON p.account = d.account
+
 GROUP BY d.account
 `)
 
@@ -135,11 +142,11 @@ GROUP BY d.account
 		)
 
 		result = append(result, r)
+
 	}
 
 	c.JSON(200, result)
 }
-
 func reportFinance(c *gin.Context) {
 
 	row := db.QueryRow(`
