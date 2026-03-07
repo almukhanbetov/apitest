@@ -33,7 +33,7 @@ func main() {
 	r.Run("0.0.0.0:8182")
 }
 func getUsers(c *gin.Context) {
-	rows, err := db.Query("SELECT id,email FROM users")
+	rows, err := db.Query("SELECT * FROM users")
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
