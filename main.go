@@ -4,12 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 
-
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 )
 
-const MYSQL_DSN = "smart_db:Asetaset_97@tcp(127.0.0.1:3306)/smart_db"
+const MYSQL_DSN = "smart_db:Zxcvbnm123@tcp(127.0.0.1:3306)/smart_db"
 
 var db *sql.DB
 
