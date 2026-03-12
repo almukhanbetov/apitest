@@ -13,32 +13,25 @@ const MYSQL_DSN = "smart_db:Zxcvbnm123@tcp(127.0.0.1:3306)/smart_db"
 var db *sql.DB
 
 func main() {
-
 	var err error
-
 	db, err = sql.Open("mysql", MYSQL_DSN)
 	if err != nil {
 		panic(err)
 	}
-
 	err = db.Ping()
 	if err != nil {
 		panic(err)
 	}
-
 	fmt.Println("MYSQL CONNECTED")
-
 	r := gin.Default()
-
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
 	})
-
 	r.GET("/users", getUsers)
-
 	r.GET("/report/devices", reportDevices)
+	r.GET("/report/device/:code", reportDeviceByCode)
 	r.GET("/report/finance", reportFinance)
 	r.GET("/report/payments", reportPayments)
 	r.GET("/report/transactions", reportTransactions)
@@ -46,17 +39,87 @@ func main() {
 
 	r.Run("0.0.0.0:8182")
 }
+func reportDeviceByCode(c *gin.Context) {
 
-func getUsers(c *gin.Context) {
+	code := c.Param("code")
 
-	rows, err := db.Query("SELECT id,phone,fullname FROM users")
+	row := db.QueryRow(`
+SELECT
+d.code_device,
+d.device_name,
+d.account,
+u.fullname,
+ds.signal_wifi,
+
+COUNT(DISTINCT t.id),
+IFNULL(SUM(t.sum),0),
+
+COUNT(DISTINCT p.id),
+IFNULL(SUM(p.sum),0),
+
+(IFNULL(SUM(p.sum),0) - IFNULL(SUM(t.sum),0))
+
+FROM devices d
+
+LEFT JOIN users u
+ON u.user_code = d.user_code
+
+LEFT JOIN device_set ds
+ON ds.account = d.account
+
+LEFT JOIN transactions t
+ON t.account = d.account
+
+LEFT JOIN payments p
+ON p.account = d.account
+
+WHERE d.code_device = ?
+
+GROUP BY d.account
+`, code)
+
+	type Device struct {
+		CodeDevice        string  `json:"code_device"`
+		DeviceName        string  `json:"device_name"`
+		Account           int     `json:"account"`
+		User              string  `json:"user"`
+		WifiSignal        int     `json:"wifi_signal"`
+		TransactionsCount int     `json:"transactions_count"`
+		TransactionsSum   float64 `json:"transactions_sum"`
+		PaymentsCount     int     `json:"payments_count"`
+		PaymentsSum       float64 `json:"payments_sum"`
+		Balance           float64 `json:"balance"`
+	}
+
+	var d Device
+
+	err := row.Scan(
+		&d.CodeDevice,
+		&d.DeviceName,
+		&d.Account,
+		&d.User,
+		&d.WifiSignal,
+		&d.TransactionsCount,
+		&d.TransactionsSum,
+		&d.PaymentsCount,
+		&d.PaymentsSum,
+		&d.Balance,
+	)
+
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
 	}
 
+	c.JSON(200, d)
+}
+func getUsers(c *gin.Context) {
+	rows, err := db.Query("SELECT id,phone,fullname FROM users")
+	if err != nil {
+		c.JSON(500, err.Error())
+		return
+	}
 	defer rows.Close()
-
 	type User struct {
 		ID       int    `json:"id"`
 		Phone    string `json:"phone"`
@@ -64,7 +127,6 @@ func getUsers(c *gin.Context) {
 	}
 
 	var users []User
-
 	for rows.Next() {
 		var u User
 		rows.Scan(&u.ID, &u.Phone, &u.Fullname)
@@ -73,7 +135,6 @@ func getUsers(c *gin.Context) {
 	c.JSON(200, users)
 }
 func reportDevices(c *gin.Context) {
-
 	rows, err := db.Query(`
 SELECT
 d.account,
@@ -105,12 +166,10 @@ ON p.account = d.account
 
 GROUP BY d.account
 `)
-
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
 	}
-
 	type DeviceReport struct {
 		Account           int     `json:"account"`
 		DeviceName        string  `json:"device_name"`
@@ -122,13 +181,9 @@ GROUP BY d.account
 		PaymentsSum       float64 `json:"payments_sum"`
 		Balance           float64 `json:"balance"`
 	}
-
 	var result []DeviceReport
-
 	for rows.Next() {
-
 		var r DeviceReport
-
 		rows.Scan(
 			&r.Account,
 			&r.DeviceName,
@@ -173,16 +228,13 @@ FROM transactions
 
 	c.JSON(200, f)
 }
-
 func reportPayments(c *gin.Context) {
-
 	rows, err := db.Query(`
 SELECT account,sum,created
 FROM payments
 ORDER BY created DESC
 LIMIT 50
 `)
-
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
@@ -205,39 +257,29 @@ LIMIT 50
 			&p.Sum,
 			&p.Created,
 		)
-
 		payments = append(payments, p)
 	}
-
 	c.JSON(200, payments)
 }
-
 func reportTransactions(c *gin.Context) {
-
 	rows, err := db.Query(`
 SELECT account,sum,created_at
 FROM transactions
 ORDER BY created_at DESC
 LIMIT 50
 `)
-
 	if err != nil {
 		c.JSON(500, err.Error())
 		return
 	}
-
 	type Tx struct {
 		Account int     `json:"account"`
 		Sum     float64 `json:"sum"`
 		Created string  `json:"created"`
 	}
-
 	var data []Tx
-
 	for rows.Next() {
-
 		var t Tx
-
 		rows.Scan(
 			&t.Account,
 			&t.Sum,
@@ -246,12 +288,9 @@ LIMIT 50
 
 		data = append(data, t)
 	}
-
 	c.JSON(200, data)
 }
-
 func reportStatus(c *gin.Context) {
-
 	rows, err := db.Query(`
 SELECT
 account,
